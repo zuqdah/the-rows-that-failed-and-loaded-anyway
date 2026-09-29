@@ -1,0 +1,26 @@
+# Credentials. These patterns exist so that a mistake fails at `git add` rather
+# than in public. Nothing in this repository needs a secret on disk: the drill
+# reads DATABRICKS_HOST and DATABRICKS_CLIENT_ID/DATABRICKS_CLIENT_SECRET from
+# the environment, and in CI those come from repository secrets.
+.databrickscfg
+*.pem
+*.key
+*.pfx
+*secret*
+*credential*
+*token*
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Drill output kept for inspection
+drill-output/

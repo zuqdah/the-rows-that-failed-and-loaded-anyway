@@ -1,0 +1,26 @@
+[project]
+name = "the-rows-that-failed-and-loaded-anyway"
+version = "0"
+description = "A Lakeflow declarative pipeline that reported success while loading every row that violated its own declared expectations."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP", "SIM", "RUF"]
+# BLE001 is deliberately not selected: several places here catch bare Exception
+# on purpose, because a call that failed for any reason at all means "not
+# measured", and the grader needs that to arrive as None rather than as a crash.
+
+[tool.ruff.lint.per-file-ignores]
+# The pipeline module runs inside the Databricks pipeline runtime, which injects
+# `spark` as a global. Ruff cannot know that and would report every use as
+# undefined; the uses are annotated individually in the file itself.
+"pipeline/expectations_pipeline.py" = ["F821"]

@@ -1,0 +1,131 @@
+{
+  "note": "Written after measuring the platform on 2026-09-29 and before the graded runs. The numbers under \"measured\" are what Databricks Free Edition actually did; the guards below are what a run has to reproduce.",
+  "fixture": {
+    "rows": 2000,
+    "violatingRows": 340,
+    "why": "Two violations are declared and counted separately so a pass cannot be earned by dropping the wrong rows: 170 rows carry a negative amount and 170 carry a null merchant. Deliberately not all rows -- if every row violated, a dropped result and an empty table would be the same observation.",
+    "constraints": {
+      "amount_non_negative": "amount >= 0",
+      "merchant_present": "merchant IS NOT NULL"
+    }
+  },
+  "thresholds": {
+    "note": "There are none. Every outcome here is an exact row count or a named pipeline state, because an expectation either admitted a row or it did not. A tolerance would be a way of not looking."
+  },
+  "expectations": [
+    {
+      "id": "warn-admits-the-violating-rows",
+      "action": "warn",
+      "table": "transactions_warn",
+      "expect": "Admitted",
+      "severity": "Critical",
+      "why": "The finding. dlt.expect records a violation and loads the row anyway, so the target table is exactly what it would have been had no expectation been declared at all. Anyone reading a pipeline that declares constraints and reports success will conclude the data satisfies them, and on this action that conclusion is wrong."
+    },
+    {
+      "id": "drop-removes-the-violating-rows",
+      "action": "drop",
+      "table": "transactions_drop",
+      "expect": "Dropped",
+      "severity": "Baseline",
+      "why": "The control. It proves the harness can observe rows actually being removed, so a drill reporting Admitted for everything -- which is what a broken row count looks like -- cannot pass the finding for free. It is also the action most people believe they wrote when they wrote expect."
+    },
+    {
+      "id": "fail-refuses-to-publish",
+      "action": "fail",
+      "table": "transactions_fail",
+      "expect": "Refused",
+      "severity": "Critical",
+      "why": "The far end of the range, measured rather than assumed: the update ends FAILED and the target table is never created. Verified by listing the schema afterwards, because an update that failed while publishing the table anyway would be a materially worse finding than either and must not be folded into this one."
+    }
+  ],
+  "assertions": [
+    {
+      "id": "the-update-succeeds-while-admitting-violations",
+      "severity": "Critical",
+      "expected": true,
+      "why": "The reason the first finding matters. The update that loaded every violating row reported COMPLETED. Pipeline state is the signal a scheduler alerts on, a dashboard shows and a person checks, and it carries the same value here as a run with no violations at all."
+    },
+    {
+      "id": "the-row-count-does-not-reveal-it",
+      "severity": "Critical",
+      "expected": true,
+      "why": "Rows in equals rows out for the warn action, so reconciling source against target -- the check a data engineer reaches for first -- agrees perfectly and proves nothing. The discrepancy people look for does not exist, because nothing was discarded."
+    },
+    {
+      "id": "the-violation-is-recorded-at-info",
+      "severity": "Critical",
+      "expected": true,
+      "why": "Declared deliberately as a thing that WORKS, because the honest claim is narrower than the dramatic one. Databricks does record it: failed_records appears in the event log under details.flow_progress.data_quality. The problem is the level. Both actions that let rows through log at INFO, and the only action logging at ERROR is the one that already stopped the update. The event log is loud exactly when it did not need to be and quiet exactly when it did.",
+      "wouldFailIf": "If this ever reports false, the lab has a bigger problem than its finding: it would mean the violation is not recorded anywhere, which is a different and more serious claim than the one made here."
+    },
+    {
+      "id": "fail-fast-undercounts-the-violations",
+      "severity": "High",
+      "expected": true,
+      "why": "Measured, not assumed. Under the warn action the event log reported a failed_records count covering every violating row. Under the fail action it reported fewer, because the update aborts on the first violation rather than evaluating the batch, and no passed_records field appears at all. The strictest action yields the least information about how bad the data was, so the count cannot be used to size the problem."
+    }
+  ],
+  "measured": {
+    "note": "Observed on Databricks Free Edition, serverless, us-east-2, 2026-09-29, against a five-row probe fixture built before the lab fixture. Recorded because these are the numbers that shaped the design.",
+    "probe": {
+      "sourceRows": 5,
+      "violatingRows": 2,
+      "warn": {
+        "updateState": "COMPLETED",
+        "targetRows": 5,
+        "eventLevel": "INFO",
+        "failedRecords": 2,
+        "passedRecords": 3,
+        "warnedRecords": 2,
+        "droppedRecords": 0
+      },
+      "drop": {
+        "updateState": "COMPLETED",
+        "targetRows": 3,
+        "eventLevel": "INFO",
+        "failedRecords": 2,
+        "passedRecords": 3,
+        "warnedRecords": 0,
+        "droppedRecords": 2
+      },
+      "fail": {
+        "updateState": "FAILED",
+        "targetPublished": false,
+        "eventLevel": "ERROR",
+        "failedRecords": 1,
+        "passedRecords": null
+      }
+    },
+    "pipelineStartupSeconds": 75,
+    "freeEditionServicePrincipal": "Supported, through the workspace-level service-principal-secrets-proxy API rather than the account console, which Free Edition blocks. The OAuth secret defaulted to a two-year lifetime."
+  },
+  "discarded": [
+    {
+      "idea": "Reading the event log with the Databricks CLI list-pipeline-events command",
+      "why": "It returns events without their details field -- 0 of 37 events carried one on CLI v1.18.0 -- and details is where data_quality lives. Read that way, a pipeline with violated expectations is indistinguishable from one that never declared any. The drill calls the REST endpoint directly. This was found by believing the CLI first, and it is why the drill asserts the field is present before reading anything out of it."
+    },
+    {
+      "idea": "Grading the warn action on the event log rather than on the target table",
+      "why": "The event log reports failed_records for every action, including drop, where the rows never landed. So the event log says what the expectation SAW and the table says what the pipeline DID, and only the second is the finding. Grading on failed_records would report the same number for warn and for drop and show no difference between them."
+    },
+    {
+      "idea": "Asserting that the event log is silent for the drop action",
+      "why": "False, and refuted on the first run: failed_records was 2 for both warn and drop. The recorded information is identical; what differs is whether the row reached the table. That assertion would have been written from an assumption about how it ought to work."
+    },
+    {
+      "idea": "Using a threshold on the proportion of violating rows admitted",
+      "why": "There is nothing to threshold. Every violating row is admitted under warn and none under drop. A percentage would imply a spectrum where the platform offers a switch, and would let a run that admitted most rows pass as though it had admitted none."
+    },
+    {
+      "idea": "Exercising all three actions in a single pipeline update",
+      "why": "The fail action ends the update, so the tables it does not concern are left unpublished or unrefreshed and cannot be graded in the same run. Two passes, with the fail action alone in the second, is the only arrangement where each action is observed in a run whose outcome it alone determined."
+    }
+  ],
+  "knownVariance": [
+    {
+      "what": "Whether a table removed from the pipeline source is dropped from the schema",
+      "observed": "After the second probe pass replaced the source file, probe_warn and probe_drop were still listed in the schema although the new source no longer defined them.",
+      "why": "Deliberately NOT graded, and the reason the drill checks for tables by name rather than counting them. A stale table left by an earlier pass is a Unity Catalog lifecycle question with nothing to do with expectations, and a guard that counted tables would fail for a reason this lab does not measure."
+    }
+  ]
+}
