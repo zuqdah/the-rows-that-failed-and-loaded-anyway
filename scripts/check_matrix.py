@@ -14,7 +14,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from expectations import load_matrix  # noqa: E402
+from expectations import load_matrix
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 

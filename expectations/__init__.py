@@ -15,11 +15,11 @@ from .outcome import (
 )
 
 __all__ = [
-    "Outcome",
     "ExpectationAction",
+    "MatrixError",
+    "Outcome",
+    "check_expectation",
+    "load_matrix",
     "resolve_admission",
     "resolve_update_verdict",
-    "load_matrix",
-    "check_expectation",
-    "MatrixError",
 ]

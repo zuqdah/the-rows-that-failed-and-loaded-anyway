@@ -48,7 +48,7 @@ def _pass():
     """Which pass this update is. Defaults to admit so a bare hand-run does something."""
     try:
         return spark.conf.get("lab.pass")  # noqa: F821 - runtime global
-    except Exception:  # noqa: BLE001 - the key is simply absent on a bare run
+    except Exception:  # the key is simply absent on a bare run
         return "admit"
 
 

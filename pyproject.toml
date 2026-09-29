@@ -19,8 +19,8 @@ select = ["E", "F", "W", "B", "UP", "SIM", "RUF"]
 # on purpose, because a call that failed for any reason at all means "not
 # measured", and the grader needs that to arrive as None rather than as a crash.
 
-[tool.ruff.lint.per-file-ignores]
-# The pipeline module runs inside the Databricks pipeline runtime, which injects
-# `spark` as a global. Ruff cannot know that and would report every use as
-# undefined; the uses are annotated individually in the file itself.
-"pipeline/expectations_pipeline.py" = ["F821"]
+# No per-file-ignores. The pipeline module relies on `spark` being injected by
+# the Databricks runtime, and the two lines that do so carry their own inline
+# noqa. A blanket per-file ignore for F821 was tried first and made those inline
+# directives redundant, which ruff correctly reported as unused noqa -- a
+# file-wide ignore would also hide a genuine undefined name in the same file.

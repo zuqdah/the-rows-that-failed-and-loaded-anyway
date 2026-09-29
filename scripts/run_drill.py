@@ -15,6 +15,7 @@ printed or written by this script.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import sys
 import time
 from pathlib import Path
@@ -24,7 +25,7 @@ from databricks.sdk.service import pipelines as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from expectations import (  # noqa: E402
+from expectations import (
     Outcome,
     check_expectation,
     load_matrix,
@@ -158,7 +159,7 @@ def scalar(w: WorkspaceClient, warehouse_id: str, sql: str):
         result = w.statement_execution.execute_statement(
             warehouse_id=warehouse_id, statement=sql, wait_timeout="50s"
         )
-    except Exception as exc:  # noqa: BLE001 - any failure here means "not measured"
+    except Exception as exc:  # any failure here means "not measured"
         log(f"   query failed: {exc}")
         return None
     state = result.status.state.value if result.status and result.status.state else "?"
@@ -175,7 +176,7 @@ def table_exists(w: WorkspaceClient, catalog: str, schema: str, table: str):
     """True, False, or None when the listing itself could not be obtained."""
     try:
         names = {t.name for t in w.tables.list(catalog_name=catalog, schema_name=schema)}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log(f"   could not list tables: {exc}")
         return None
     return table in names
@@ -391,13 +392,13 @@ def main() -> int:
         try:
             w.pipelines.delete(pipeline_id)
             log("   pipeline deleted")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log(f"   could not delete pipeline: {exc}")
         for table in ("transactions_source", "transactions_warn", "transactions_drop", "transactions_fail"):
-            try:
+            # Absent is the expected case for whichever targets this pass did
+            # not build, so a failure to delete one is not worth reporting.
+            with contextlib.suppress(Exception):
                 w.tables.delete(f"{fq}.{table}")
-            except Exception:  # noqa: BLE001 - absent is the expected case for some
-                pass
         remaining = table_exists(w, args.catalog, args.schema, "transactions_warn")
         log(f"   transactions_warn still present after cleanup: {remaining}")
 
